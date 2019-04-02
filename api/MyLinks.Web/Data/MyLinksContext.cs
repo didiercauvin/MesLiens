@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using MyLinks.Web.Models;
+using System.Collections.Generic;
 
 namespace MyLinks.Web.Data
 {
@@ -10,6 +11,23 @@ namespace MyLinks.Web.Data
 
         public MyLinksContext(DbContextOptions<MyLinksContext> options): base(options)
         {
+
+        }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<Category>().HasData(new Category
+            {
+                Id = 1,
+                Name = "Tech"
+            });
+
+            modelBuilder.Entity<Link>().HasData(new
+            {
+                Id = 1,
+                CategoryId = 1,
+                Url = "http://uneurldetest.com"
+            });
 
         }
     }
