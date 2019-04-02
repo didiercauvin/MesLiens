@@ -2,3 +2,4 @@ bin
 obj
 .vscode
 mylinks.code-workspace
+/api/.vs/Mylinks/v15
