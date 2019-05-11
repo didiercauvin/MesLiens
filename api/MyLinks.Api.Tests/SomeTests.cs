@@ -10,96 +10,142 @@ namespace MyLinks.Api.Tests
     public class SomeTests
     {
         [Fact]
-        public void CategoryMustHaveANameAndHasNoLinkWhenCreated()
+        public void ShouldReturnEmptyArrayOfCategories()
         {
-            var repo = new Mock<ICategoryRepository>();
+            var queryHandler = new Mock<GetAllCategoriesQueryHandler>();
+            queryHandler
+                .Setup(x => x.Execute())
+                .Returns(new Category[0]);
 
-            var category = new Category("some category");
-            var service = new CategoryService(repo.Object);
+            var queryDispatcher = new QueryDispatcher(queryHandler.Object, null);
+            var gateway = new CategoryServiceGateway(queryDispatcher);
 
-            service.CreateCategory(category);
-            var links = category.Links;
+            var categories = gateway.GetAllCategories(new GetAllCategoriesQuery());
 
-            repo.Verify(x => x.CreateCategory(category), Times.Once);
-            Assert.Empty(links);
+            Assert.Empty(categories);
+        }
+        
+        [Fact]
+        public void ShouldReturnCategories()
+        {
+            var queryHandler = new Mock<GetAllCategoriesQueryHandler>();
+            queryHandler
+                .Setup(x => x.Execute())
+                .Returns(new Category[] { new Category()});
+
+            var queryDispatcher = new QueryDispatcher(queryHandler.Object, null);
+            var gateway = new CategoryServiceGateway(queryDispatcher);
+
+            var categories = gateway.GetAllCategories(new GetAllCategoriesQuery());
+
+            Assert.NotEmpty(categories);
         }
 
         [Fact]
-        public void LinkCanBeAddedToCategoryAndSaved()
+        public void ShouldReturnCategoryById()
         {
-            var repo = new Mock<ICategoryRepository>();
+            var queryHandler = new Mock<GetCategoryByIdQueryHandler>();
 
-            var category = new Category("some category");
-            var service = new CategoryService(repo.Object);
-            var expected = 3;
+            var queryDispatcher = new QueryDispatcher(null, queryHandler.Object);
 
-            service.AddLink(category, new Link());
-            service.AddLink(category, new Link());
-            service.AddLink(category, new Link());
+            var gateway = new CategoryServiceGateway(queryDispatcher);
 
-            var actual = category.Links.Count();
+            var category = gateway.GetCategoryById(1);
 
-            repo.Verify(x => x.SaveLink(category, It.IsAny<Link>()), Times.Exactly(expected));
-            Assert.Equal(expected, actual);
+            Assert.NotNull(category);
         }
-       
-        //
-        // Categories can't have same names
-        // A link is part of a category
-        // A link has a name and an URI
+
     }
 
-    public interface ICategoryRepository
+    public class GetCategoryByIdQueryHandler : IQueryHandler<GetCategoryByIdQuery, Category>
     {
-        void CreateCategory(Category category);
-        void SaveLink(Category category, Link link);
+        public virtual Category Execute()
+        {
+            throw new NotImplementedException();
+        }
     }
 
-    public class CategoryService
+    public class GetCategoryByIdQuery
     {
-        private readonly ICategoryRepository repo;
+    }
 
-        public CategoryService(ICategoryRepository @object)
+    public class GetAllCategoriesQueryHandler : IQueryHandler<GetAllCategoriesQuery, IEnumerable<Category>>
+    {
+        public virtual IEnumerable<Category> Execute()
         {
-            this.repo = @object;
+            throw new NotImplementedException();
+        }
+    }
+
+    public class QueryDispatcher : IQueryDispatcher
+    {
+        private GetAllCategoriesQueryHandler getAllCategoriesQueryHandler;
+
+        public QueryDispatcher(GetAllCategoriesQueryHandler getAllCategoriesQueryHandler, 
+                               GetCategoryByIdQueryHandler getCategoryByIdQueryHandler)
+        {
+            if (getAllCategoriesQueryHandler == null)
+            {
+                throw new ArgumentNullException("GetAllCategoriesQueryHandler must not be null");
+            }
+            if (getCategoryByIdQueryHandler == null)
+            {
+                throw new ArgumentNullException("GetCategoryByIdQueryHandler must not be null");
+            }
+
+            this.getAllCategoriesQueryHandler = getAllCategoriesQueryHandler;
         }
 
-        public void CreateCategory(Category category)
+        public IQueryHandler<IQuery, TResult> Dispatch<IQuery, TResult>(IQuery query)
         {
-            repo.CreateCategory(category);
+            return (IQueryHandler<IQuery, TResult>)getAllCategoriesQueryHandler;
+        }
+    }
+
+    public interface IQueryDispatcher
+    {
+        IQueryHandler<IQuery, TResult> Dispatch<IQuery, TResult>(IQuery query);
+    }
+
+    public interface IQueryHandler<IQuery, TResult>
+    {
+        TResult Execute();
+    }
+
+    public interface IQuery<TResult>
+    {
+    }
+    
+
+    public class CategoryServiceGateway
+    {
+        private IQueryDispatcher queryDispatcher;
+
+        public CategoryServiceGateway(IQueryDispatcher queryDispatcher)
+        {
+            this.queryDispatcher = queryDispatcher;
         }
 
-        public void AddLink(Category category, Link link)
+        public IEnumerable<Category> GetAllCategories(GetAllCategoriesQuery query)
         {
-            repo.SaveLink(category, link);
-            category.AddLink(link);
+            var handler = queryDispatcher.Dispatch<GetAllCategoriesQuery, IEnumerable<Category>>(query);
+
+            return handler.Execute();
         }
+
+        internal object GetCategoryById(int v)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class GetAllCategoriesQuery : IQuery<IEnumerable<Category>>
+    {
     }
 
     public class Category
     {
-        private readonly List<Link> links;
-
-        public IEnumerable<Link> Links
-        {
-            get
-            {
-                return links;
-            }
-        }
-
-        public Category(string v)
-        {
-            links = new List<Link>();
-        }
-
-        public void AddLink(Link link)
-        {
-            links.Add(link);
-        }
     }
-
-    public class Link
-    {
-    }
+    
 }
+
