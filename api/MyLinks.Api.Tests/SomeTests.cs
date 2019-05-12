@@ -1,9 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
-using Moq;
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using Xunit;
 
 namespace MyLinks.Api.Tests
