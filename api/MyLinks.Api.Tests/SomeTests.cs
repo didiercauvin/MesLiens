@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using System;
 using System.Collections;
@@ -12,12 +13,16 @@ namespace MyLinks.Api.Tests
         [Fact]
         public void ShouldReturnEmptyArrayOfCategories()
         {
-            var queryHandler = new Mock<GetAllCategoriesQueryHandler>();
-            queryHandler
-                .Setup(x => x.Execute())
-                .Returns(new Category[0]);
+            //var queryHandler = new Mock<GetAllCategoriesQueryHandler>();
+            //queryHandler
+            //    .Setup(x => x.Execute())
+            //    .Returns(new Category[0]);
 
-            var queryDispatcher = new QueryDispatcher(queryHandler.Object, null);
+            var services = new ServiceCollection();
+            services.AddScoped(typeof(IQueryHandler<GetAllCategoriesQuery,IEnumerable<Category>>), typeof(GetAllCategoriesQueryHandler));
+
+            var service = services.BuildServiceProvider();
+            var queryDispatcher = new QueryDispatcher(service);
             var gateway = new CategoryServiceGateway(queryDispatcher);
 
             var categories = gateway.GetAllCategories(new GetAllCategoriesQuery());
@@ -25,91 +30,41 @@ namespace MyLinks.Api.Tests
             Assert.Empty(categories);
         }
         
-        [Fact]
-        public void ShouldReturnCategories()
-        {
-            var queryHandler = new Mock<GetAllCategoriesQueryHandler>();
-            queryHandler
-                .Setup(x => x.Execute())
-                .Returns(new Category[] { new Category()});
-
-            var queryDispatcher = new QueryDispatcher(queryHandler.Object, null);
-            var gateway = new CategoryServiceGateway(queryDispatcher);
-
-            var categories = gateway.GetAllCategories(new GetAllCategoriesQuery());
-
-            Assert.NotEmpty(categories);
-        }
-
-        [Fact]
-        public void ShouldReturnCategoryById()
-        {
-            var queryHandler = new Mock<GetCategoryByIdQueryHandler>();
-
-            var queryDispatcher = new QueryDispatcher(null, queryHandler.Object);
-
-            var gateway = new CategoryServiceGateway(queryDispatcher);
-
-            var category = gateway.GetCategoryById(1);
-
-            Assert.NotNull(category);
-        }
-
-    }
-
-    public class GetCategoryByIdQueryHandler : IQueryHandler<GetCategoryByIdQuery, Category>
-    {
-        public virtual Category Execute()
-        {
-            throw new NotImplementedException();
-        }
-    }
-
-    public class GetCategoryByIdQuery
-    {
     }
 
     public class GetAllCategoriesQueryHandler : IQueryHandler<GetAllCategoriesQuery, IEnumerable<Category>>
     {
-        public virtual IEnumerable<Category> Execute()
+        public virtual IEnumerable<Category> Execute(GetAllCategoriesQuery query)
         {
-            throw new NotImplementedException();
+            return new Category[0];
         }
     }
 
     public class QueryDispatcher : IQueryDispatcher
     {
-        private GetAllCategoriesQueryHandler getAllCategoriesQueryHandler;
+        private readonly IServiceProvider provider;
 
-        public QueryDispatcher(GetAllCategoriesQueryHandler getAllCategoriesQueryHandler, 
-                               GetCategoryByIdQueryHandler getCategoryByIdQueryHandler)
+        public QueryDispatcher(IServiceProvider provider)
         {
-            if (getAllCategoriesQueryHandler == null)
-            {
-                throw new ArgumentNullException("GetAllCategoriesQueryHandler must not be null");
-            }
-            if (getCategoryByIdQueryHandler == null)
-            {
-                throw new ArgumentNullException("GetCategoryByIdQueryHandler must not be null");
-            }
-
-            this.getAllCategoriesQueryHandler = getAllCategoriesQueryHandler;
+            this.provider = provider;
         }
 
-        public IQueryHandler<IQuery, TResult> Dispatch<IQuery, TResult>(IQuery query)
+        public TResult Execute<TResult>(IQuery<TResult> query)
         {
-            return (IQueryHandler<IQuery, TResult>)getAllCategoriesQueryHandler;
+            var handlerType = typeof(IQueryHandler<,>).MakeGenericType(query.GetType(), typeof(TResult));
+            dynamic handler = provider.GetService(handlerType);
+            return handler.Execute((dynamic)query);
         }
     }
 
     public interface IQueryDispatcher
     {
-        IQueryHandler<IQuery, TResult> Dispatch<IQuery, TResult>(IQuery query);
+        TResult Execute<TResult>(IQuery<TResult> query);
     }
 
-    public interface IQueryHandler<IQuery, TResult>
+    public interface IQueryHandler<TQuery, TResult> where TQuery: IQuery<TResult>
     {
-        TResult Execute();
+        TResult Execute(TQuery query);
     }
 
     public interface IQuery<TResult>
@@ -128,14 +83,7 @@ namespace MyLinks.Api.Tests
 
         public IEnumerable<Category> GetAllCategories(GetAllCategoriesQuery query)
         {
-            var handler = queryDispatcher.Dispatch<GetAllCategoriesQuery, IEnumerable<Category>>(query);
-
-            return handler.Execute();
-        }
-
-        internal object GetCategoryById(int v)
-        {
-            throw new NotImplementedException();
+            return queryDispatcher.Execute(query);
         }
     }
 
