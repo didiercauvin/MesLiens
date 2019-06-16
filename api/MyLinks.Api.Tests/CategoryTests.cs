@@ -1,8 +1,9 @@
-﻿using System;
+﻿using MyLinks.Application.Contracts;
+using MyLinks.Application.Entity;
+using MyLinks.Application.Messages.CreateCategory;
+using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using System.Linq;
-using System.Text;
 using Xunit;
 
 namespace MyLinks.Api.Tests
@@ -113,59 +114,4 @@ namespace MyLinks.Api.Tests
         }
     }
 
-    internal interface IPersistence
-    {
-        void Create(Category category);
-        Category FindByName(string name);
-    }
-
-    internal class CreateCategoryCommandHandler
-    {
-        private readonly IPersistence persistence;
-
-        public CreateCategoryCommandHandler(IPersistence persistence)
-        {
-            this.persistence = persistence;
-        }
-
-        internal void Execute(CreateCategoryCommand command)
-        {
-            if (!command.Id.HasValue)
-            {
-                throw new ArgumentNullException("Id", "Category must have a id");
-            }
-
-            if (string.IsNullOrWhiteSpace(command.Name))
-            {
-                throw new ArgumentOutOfRangeException("Name", "Category must have a name");
-            }
-
-            if (persistence.FindByName(command.Name) != null)
-            {
-                throw new ArgumentException();
-            }
-
-            persistence.Create(new Category(id: command.Id.Value, name: command.Name));
-        }
-    }
-
-    internal class Category
-    {
-        public Category(Guid id, string name)
-        {
-            Id = id;
-            this.Name = name;
-        }
-
-        public string Name { get; }
-        public Guid Id { get; }
-    }
-
-    internal class CreateCategoryCommand
-    {
-        [Required]
-        public Guid? Id { get; set; }
-        [Required]
-        public string Name { get; set; }
-    }
 }
