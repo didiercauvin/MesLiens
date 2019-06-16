@@ -12,46 +12,54 @@ namespace MyLinks.Api.Tests
         [Fact(DisplayName = "Category must have a name in order to be created")]
         public void RequiresName()
         {
-            var result = new List<ValidationResult>();
-            var command = new CreateCategoryCommand();
-            var isValid = Validator.TryValidateProperty(command.Name, new ValidationContext(command) { MemberName = "Name" }, result);
+            var command = new CreateCategoryCommand()
+            {
+                Id = Guid.NewGuid()
+            };
 
-            Assert.False(isValid);
+            var handler = new CreateCategoryCommandHandler(new FakePersistence());
+
+            var exception = Assert.Throws<ArgumentOutOfRangeException>(() => handler.Execute(command));
         }
 
-        [Fact(DisplayName = "Clients must specify a GUID in order to create a category")]
+        [Fact(DisplayName = "Category must have a GUID in order to be created")]
         public void MustSpecifyGuid()
         {
-            var result = new List<ValidationResult>();
-            var command = new CreateCategoryCommand();
+            var command = new CreateCategoryCommand()
+            {
+                Name = "name"
+            };
+            var handler = new CreateCategoryCommandHandler(new FakePersistence());
 
-            var isValid = Validator.TryValidateProperty(command.Id, new ValidationContext(command) { MemberName = "Id" }, result);
-
-            Assert.False(isValid);
+            var exception = Assert.Throws<ArgumentNullException>(() => handler.Execute(command));
         }
 
-        [Fact]
-        public void ShouldFindByName()
+        [Theory(DisplayName = "Persistence must be able to find by name")]
+        [InlineData("tech")]
+        [InlineData("food")]
+        public void ShouldFindByName(string name)
         {
             IPersistence persistence = new FakePersistence();
 
-            var tech = new Category(name: "tech");
+            var tech = new Category(id: Guid.NewGuid(), name: name);
 
             persistence.Create(tech);
 
             Assert.Equal(persistence.FindByName(tech.Name), tech);
         }
 
-        [Fact]
+        [Fact(DisplayName = "Category name must be unique")]
         public void NameMustBeUnique()
         {
             var command1 = new CreateCategoryCommand()
             {
+                Id = Guid.NewGuid(),
                 Name = "name"
             };
 
             var command2 = new CreateCategoryCommand()
             {
+                Id = Guid.NewGuid(),
                 Name = "name"
             };
 
@@ -63,9 +71,26 @@ namespace MyLinks.Api.Tests
             Assert.Throws<ArgumentException>(() => commandHandler.Execute(command2));
         }
 
-        // une catégorie doit avoir un nom unique
-        // on doit pouvoir rechercher une categorie par son nom
-        // on doit pouvoir sauver une catégorie
+        [Fact(DisplayName = "Persistence must be able to save category")]
+        public void ShouldSaveCategory()
+        {
+            var command = new CreateCategoryCommand()
+            {
+                Id = Guid.NewGuid(),
+                Name = "name"
+            };
+
+            FakePersistence persistence = new FakePersistence();
+            var commandHandler = new CreateCategoryCommandHandler(persistence);
+
+            commandHandler.Execute(command);
+
+            var category = persistence.FindByName(command.Name);
+
+            Assert.Equal(command.Id.Value, category.Id);
+            Assert.Equal(command.Name, category.Name);
+
+        }
     }
 
     internal class FakePersistence : IPersistence
@@ -105,23 +130,35 @@ namespace MyLinks.Api.Tests
 
         internal void Execute(CreateCategoryCommand command)
         {
+            if (!command.Id.HasValue)
+            {
+                throw new ArgumentNullException("Id", "Category must have a id");
+            }
+
+            if (string.IsNullOrWhiteSpace(command.Name))
+            {
+                throw new ArgumentOutOfRangeException("Name", "Category must have a name");
+            }
+
             if (persistence.FindByName(command.Name) != null)
             {
                 throw new ArgumentException();
             }
 
-            persistence.Create(new Category(name: command.Name));
+            persistence.Create(new Category(id: command.Id.Value, name: command.Name));
         }
     }
 
     internal class Category
     {
-        public Category(string name)
+        public Category(Guid id, string name)
         {
+            Id = id;
             this.Name = name;
         }
 
         public string Name { get; }
+        public Guid Id { get; }
     }
 
     internal class CreateCategoryCommand
